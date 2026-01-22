@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KU Timetable Builder</title>
+    <style>
+        :root { --primary-color: #8b0029; } /* 고려대 크림슨 색상 */
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8f9fa; margin: 0; padding: 15px; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { margin-top: 0; color: var(--primary-color); font-size: 1.2rem; text-align: center; }
+        
+        input, button { 
+            width: 100%; padding: 12px; margin: 8px 0; 
+            border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box;
+        }
+        button { 
+            background-color: var(--primary-color); color: white; border: none; 
+            font-weight: bold; cursor: pointer; margin-top: 15px;
+        }
+        
+        .result-info { text-align: center; margin-bottom: 15px; font-weight: bold; }
+        
+        /* 시간표 그리드 스타일 */
+        .timetable-container { 
+            overflow-x: auto; background: white; padding: 10px; border-radius: 8px;
+            border: 1px solid #eee; margin-bottom: 30px;
+        }
+        table { border-collapse: collapse; table-layout: fixed; width: 600px; position: relative; }
+        th, td { border: 1px solid #eee; height: 50px; text-align: center; position: relative; font-size: 10px; }
+        th { background-color: #f8f9fa; height: 35px; color: #666; }
+        .time-label { width: 50px; background-color: #f8f9fa; color: #999; }
+        
+        /* 과목 블록 */
+        .subject-block {
+            position: absolute; left: 0; right: 0; top: 0;
+            border-radius: 4px; padding: 4px 2px; color: white;
+            display: flex; flex-direction: column; justify-content: center;
+            box-sizing: border-box; z-index: 5; line-height: 1.1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .subject-name { font-weight: bold; font-size: 10px; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>🐯 KU 시간표 빌더 (PWA)</h2>
+    <input type="text" id="subjects" placeholder="후보 과목 (예: MATH161, COSE221-01)">
+    <input type="number" id="min_courses" placeholder="최소 과목 수 (예: 5)" value="1">
+    <input type="text" id="required" placeholder="필수 포함 과목 (선택)">
+    <button onclick="getSchedule()">조합 계산하기</button>
+</div>
+
+<div id="status" class="result-info"></div>
+<div id="resultArea"></div>
+
+<script>
+    const colors = ['#ef5350', '#66bb6a', '#42a5f5', '#fbc02d', '#ab47bc', '#26a69a', '#ffa726', '#78909c'];
+    const days = ['월', '화', '수', '목', '금'];
+
+    async function getSchedule() {
+        const btn = document.querySelector('button');
+        btn.innerText = "계산 중...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/solve', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    subjects: document.getElementById('subjects').value,
+                    min_courses: document.getElementById('min_courses').value,
+                    required: document.getElementById('required').value
+                })
+            });
+            const data = await res.json();
+            document.getElementById('status').innerText = `총 ${data.length}개의 조합 발견`;
+            renderResults(data);
+        } catch (e) {
+            alert("오류가 발생했습니다.");
+        } finally {
+            btn.innerText = "조합 계산하기";
+            btn.disabled = false;
+        }
+    }
+
+    function renderResults(results) {
+        const container = document.getElementById('resultArea');
+        container.innerHTML = "";
+
+        results.forEach((schedule, idx) => {
+            let html = `<div class="card"><h3>후보 ${idx + 1}번 (${schedule.length}과목)</h3>`;
+            html += `<div class="timetable-container"><table><thead><tr><th class="time-label"></th>`;
+            days.forEach(d => html += `<th>${d}</th>`);
+            html += `</tr></thead><tbody>`;
+
+            // 1~10교시 행 생성
+            for (let p = 1; p <= 10; p++) {
+                html += `<tr><td class="time-label">${p}</td>`;
+                days.forEach(day => {
+                    html += `<td id="cell-${idx}-${day}-${p}"></td>`;
+                });
+                html += `</tr>`;
+            }
+            html += `</tbody></table></div></div>`;
+            container.innerHTML += html;
+
+            // 과목 블록 배치 (DOM 생성 후 처리)
+            setTimeout(() => {
+                schedule.forEach((s, sIdx) => {
+                    const color = colors[sIdx % colors.length];
+                    s.parsed_times.forEach(time => {
+                        const startP = time.periods[0];
+                        const rowspan = time.periods.length;
+                        const cellId = `cell-${idx}-${time.day}-${startP}`;
+                        const cell = document.getElementById(cellId);
+                        
+                        if (cell) {
+                            const block = document.createElement('div');
+                            block.className = 'subject-block';
+                            block.style.backgroundColor = color;
+                            block.style.height = `${rowspan * 51}px`; // td 높이 50px + 보더 고려
+                            block.innerHTML = `
+                                <div class="subject-name">${s.name}</div>
+                                <div style="font-size:8px;">${s.prof}</div>
+                            `;
+                            cell.appendChild(block);
+                        }
+                    });
+                });
+            }, 0);
+        });
+    }
+</script>
+</body>
+</html>
