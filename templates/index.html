@@ -59,6 +59,48 @@
     const colors = ['#ef5350', '#66bb6a', '#42a5f5', '#fbc02d', '#ab47bc', '#26a69a', '#ffa726', '#78909c'];
     const days = ['월', '화', '수', '목', '금'];
 
+    // 쿠키 저장 함수
+    function setCookie(name, value, days = 365) {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+        document.cookie = `${name}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=/`;
+    }
+
+    // 쿠키 읽기 함수
+    function getCookie(name) {
+        const nameEQ = name + "=";
+        const ca = document.cookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) === 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        }
+        return null;
+    }
+
+    // 페이지 로드 시 쿠키에서 값 불러오기 및 입력 필드 변경 감지
+    window.addEventListener('DOMContentLoaded', function() {
+        // 쿠키에서 값 불러오기
+        const subjects = getCookie('subjects');
+        const minCourses = getCookie('min_courses');
+        const required = getCookie('required');
+        
+        if (subjects) document.getElementById('subjects').value = subjects;
+        if (minCourses) document.getElementById('min_courses').value = minCourses;
+        if (required) document.getElementById('required').value = required;
+
+        // 입력 필드 변경 시 쿠키에 저장
+        document.getElementById('subjects').addEventListener('input', function() {
+            setCookie('subjects', this.value);
+        });
+        document.getElementById('min_courses').addEventListener('input', function() {
+            setCookie('min_courses', this.value);
+        });
+        document.getElementById('required').addEventListener('input', function() {
+            setCookie('required', this.value);
+        });
+    });
+
     async function getSchedule() {
         const btn = document.querySelector('button');
         btn.innerText = "계산 중...";
